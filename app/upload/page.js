@@ -109,8 +109,26 @@ export default function UploadPage() {
       if (!res.ok) throw new Error(data.error || 'Extraction failed');
 
       setActiveStep(4);
+      // Merge with existing data if it exists
+      const existingRaw = sessionStorage.getItem('menuData');
+      if (existingRaw) {
+        try {
+          const existingData = JSON.parse(existingRaw);
+          if (existingData && Array.isArray(existingData.items)) {
+            data.items = [...existingData.items, ...data.items];
+            data.count = data.items.length;
+          }
+        } catch (e) {
+          console.error("Failed to parse existing menu data", e);
+        }
+      }
+
       sessionStorage.setItem('menuData', JSON.stringify(data));
-      sessionStorage.setItem('menuFileName', file.name);
+      
+      const prevNames = sessionStorage.getItem('menuFileName');
+      const newNames = prevNames ? `${prevNames}, ${file.name}` : file.name;
+      sessionStorage.setItem('menuFileName', newNames);
+      
       sessionStorage.setItem('menuIsDemo', 'false');
 
       setTimeout(() => { setStatus('done'); router.push('/results'); }, 600);

@@ -66,6 +66,7 @@ function MenuItemCard({ item }) {
 }
 
 export default function ResultsPage() {
+  const router = import('next/navigation').then(m => m.useRouter)().catch(() => ({ push: () => window.location.href = '/upload' }));
   const [menuData, setMenuData] = useState(null);
   const [fileName, setFileName] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -134,6 +135,13 @@ export default function ResultsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleClear = () => {
+    sessionStorage.removeItem('menuData');
+    sessionStorage.removeItem('menuFileName');
+    sessionStorage.removeItem('menuIsDemo');
+    window.location.href = '/upload';
+  };
+
   return (
     <div className="page-wrapper">
       <Navbar />
@@ -172,8 +180,11 @@ export default function ResultsPage() {
                 ⬇️ Export JSON
               </button>
               <Link href="/upload" className="btn btn-primary btn-sm" id="upload-another-btn">
-                + Upload Another
+                + Upload Another Page
               </Link>
+              <button className="btn btn-secondary btn-sm" onClick={handleClear} id="clear-btn" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: 'var(--danger)' }}>
+                🗑️ Clear
+              </button>
             </div>
           </div>
 
