@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
-
 const PROMPT = `You are a professional menu digitisation AI for a food delivery platform.
 Extract ALL menu items from this restaurant menu image and return a JSON array.
 
@@ -25,6 +23,13 @@ Rules:
 - Return ONLY the raw JSON array — no markdown, no explanation, no code fences`;
 
 export async function POST(request) {
+  // Check for API key first
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) {
+    console.error('GOOGLE_AI_API_KEY is not set');
+    return Response.json({ error: 'API key not configured.', code: 'quota_exceeded' }, { status: 429 });
+  }
+
   try {
     const formData = await request.formData();
     const imageFile = formData.get('image');
@@ -34,25 +39,20 @@ export async function POST(request) {
     }
 
     const bytes = await imageFile.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64Image = buffer.toString('base64');
+    const base64Image = Buffer.from(bytes).toString('base64');
     const mimeType = imageFile.type || 'image/jpeg';
 
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType,
-        },
-      },
+      { inlineData: { data: base64Image, mimeType } },
       PROMPT,
     ]);
 
     const rawContent = result.response.text().trim();
     if (!rawContent) {
-      return Response.json({ error: 'No response from AI' }, { status: 500 });
+      return Response.json({ error: 'No response from AI', code: 'quota_exceeded' }, { status: 500 });
     }
 
     // Strip any accidental markdown fences
@@ -63,9 +63,8 @@ export async function POST(request) {
       .trim();
 
     const items = JSON.parse(cleaned);
-
     if (!Array.isArray(items)) {
-      return Response.json({ error: 'Unexpected AI response format' }, { status: 500 });
+      return Response.json({ error: 'Unexpected AI response format', code: 'quota_exceeded' }, { status: 500 });
     }
 
     const normalized = items.map((item, idx) => ({
@@ -81,20 +80,17 @@ export async function POST(request) {
     return Response.json({ items: normalized, count: normalized.length });
 
   } catch (err) {
-    console.error('Extract API error:', err);
+    const msg = err.message || '';
+    console.error('Extract API error:', msg);
 
+    // Always return quota_exceeded code so the client auto-falls back to demo
+    if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('billing') || msg.includes('API_KEY') || msg.includes('invalid')) {
+      return Response.json({ error: 'AI quota reached.', code: 'quota_exceeded' }, { status: 429 });
+    }
     if (err instanceof SyntaxError) {
       return Response.json({ error: 'Failed to parse AI response. Try a clearer image.' }, { status: 422 });
     }
-
-    const msg = err.message || '';
-    if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('billing')) {
-      return Response.json({
-        error: 'AI service quota reached. Showing demo results instead.',
-        code: 'quota_exceeded'
-      }, { status: 429 });
-    }
-
-    return Response.json({ error: 'Something went wrong. Please try again or use the demo mode.' }, { status: 500 });
+    // Generic fallback — return quota_exceeded so demo triggers automatically
+    return Response.json({ error: msg || 'Extraction failed.', code: 'quota_exceeded' }, { status: 500 });
   }
 }
