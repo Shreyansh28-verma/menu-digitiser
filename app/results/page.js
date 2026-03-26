@@ -18,9 +18,13 @@ function VegBadge({ isVeg }) {
 }
 
 function MenuItemCard({ item }) {
-  const hasFlags = item.flags && item.flags.length > 0;
+  // Use either new missingFields array or old flags array
+  const missing = item.missingFields || item.flags || [];
+  const needsReview = missing.length > 0 || (item.confidence && item.confidence < 0.7);
+  const confidencePercent = item.confidence ? (item.confidence * 100).toFixed(0) : 100;
+
   return (
-    <div className={`menu-item-card ${hasFlags ? 'has-flags' : ''}`}>
+    <div className={`menu-item-card ${needsReview ? 'has-flags' : ''}`}>
       <div className="item-header">
         <div className="item-name">{item.name}</div>
         {item.price
@@ -39,15 +43,24 @@ function MenuItemCard({ item }) {
         : <div className="item-desc-missing">No description available</div>
       }
 
-      {hasFlags && (
-        <div className="flag-list">
-          {item.flags.map(flag => (
-            <div key={flag} className="flag-item">
-              {FLAG_MESSAGES[flag] || flag}
-            </div>
-          ))}
+      {missing.length > 0 && (
+        <div className="text-red-500" style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '4px' }}>
+          <strong>Missing:</strong> {missing.join(', ')}
         </div>
       )}
+
+      {/* Product Intelligence Footer */}
+      <div style={{ marginTop: 'auto', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          Confidence: {confidencePercent}%
+        </div>
+        
+        {needsReview && (
+          <div style={{ color: 'var(--warning)', fontSize: '0.75rem', fontWeight: 'bold' }}>
+            ⚠️ Needs Review
+          </div>
+        )}
+      </div>
     </div>
   );
 }

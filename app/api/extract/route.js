@@ -6,27 +6,29 @@ Extract ALL menu items from this restaurant menu image and return a JSON array.
 Each item MUST have this exact structure:
 {
   "name": "Item name (required, string)",
-  "category": "Starters | Mains | Desserts | Beverages | Sides | Combos",
+  "category": "Starters | Mains | Desserts | Beverages | Sides | Combos | Other",
   "isVeg": true | false | null,
   "price": "₹XXX or $X.XX as string, or null if not visible",
   "description": "Description text or null if not present",
-  "flags": ["missing_veg_info", "missing_price", "missing_description"]
+  "missingFields": ["isVeg", "price", "description"],
+  "confidence": 0.95
 }
 
 Rules:
-- Extract EVERY item visible — do not skip any
-- Category: infer from section headers or item type; default to "Mains" if unsure
-- isVeg: true if green dot/leaf/VEG label, false if red dot/NON-VEG, null if unclear
-- price: extract with currency symbol exactly as shown, null if missing
-- description: extract any description text shown, null if none
-- flags: add "missing_veg_info" if isVeg is null, "missing_price" if price is null, "missing_description" if description is null
-- Return ONLY the raw JSON array — no markdown, no explanation, no code fences`;
+- Extract EVERY item visible. Do not make up items.
+- If the image is just a single food item and NOT a menu, extract just that one item.
+- If the image is not food or a menu at all, return an empty array [].
+- Category: infer from section headers or item type; default to "Other" if completely unsure.
+- isVeg: true if green dot/leaf/VEG label, false if red dot/NON-VEG, null if unclear.
+- price: extract with currency symbol exactly as shown, null if missing.
+- confidence: float between 0.0 and 1.0 representing your confidence in this extraction.
+- missingFields: list which of these fields (isVeg, price, description) are null or missing.
+- Return ONLY the raw JSON array — no markdown, no explanation, no code fences.`;
 
 export async function POST(request) {
-  // Check for API key first
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error('GOOGLE_AI_API_KEY is not set');
+    console.error('API Key is not set');
     return Response.json({ error: 'API key not configured.', code: 'quota_exceeded' }, { status: 429 });
   }
 
@@ -52,7 +54,7 @@ export async function POST(request) {
 
     const rawContent = result.response.text().trim();
     if (!rawContent) {
-      return Response.json({ error: 'No response from AI', code: 'quota_exceeded' }, { status: 500 });
+      return Response.json({ error: 'No response from AI' }, { status: 500 });
     }
 
     // Strip any accidental markdown fences
@@ -62,20 +64,61 @@ export async function POST(request) {
       .replace(/```\s*$/i, '')
       .trim();
 
-    const items = JSON.parse(cleaned);
-    if (!Array.isArray(items)) {
-      return Response.json({ error: 'Unexpected AI response format', code: 'quota_exceeded' }, { status: 500 });
+    let items = [];
+    try {
+      items = JSON.parse(cleaned);
+    } catch (e) {
+      // Sometimes Gemini adds extra text. Try to extract just the array.
+      const match = cleaned.match(/\[[\s\S]*\]/);
+      if (match) {
+        items = JSON.parse(match[0]);
+      } else {
+        throw e;
+      }
     }
 
-    const normalized = items.map((item, idx) => ({
-      id: `item-${idx}`,
-      name: item.name || 'Unknown Item',
-      category: item.category || 'Mains',
-      isVeg: item.isVeg !== undefined ? item.isVeg : null,
-      price: item.price || null,
-      description: item.description || null,
-      flags: Array.isArray(item.flags) ? item.flags : [],
-    }));
+    if (!Array.isArray(items)) {
+      return Response.json({ error: 'Unexpected AI response format' }, { status: 500 });
+    }
+
+    // Post-processing & normalization
+    const normalized = items.map((item, idx) => {
+      let cat = item.category || 'Other';
+      const name = (item.name || '').toLowerCase();
+
+      // Smart Touch Categorization
+      if (cat === 'Other' || cat === 'Mains') {
+        if (name.includes('paneer') || name.includes('chicken') || name.includes('mutton') || name.includes('dal')) {
+          cat = 'Mains';
+        } else if (name.includes('soup') || name.includes('tikka') || name.includes('kebab') || name.includes('roll')) {
+          cat = 'Starters';
+        } else if (name.includes('ice cream') || name.includes('jamun') || name.includes('brownie')) {
+          cat = 'Desserts';
+        } else if (name.includes('naan') || name.includes('roti') || name.includes('rice')) {
+          cat = 'Sides';
+        }
+      }
+
+      const missingFields = Array.isArray(item.missingFields) ? item.missingFields : [];
+      // map old flags to missingFields if model used old naming
+      if (Array.isArray(item.flags)) {
+        if (item.flags.includes('missing_veg_info')) missingFields.push('isVeg');
+        if (item.flags.includes('missing_price')) missingFields.push('price');
+        if (item.flags.includes('missing_description')) missingFields.push('description');
+      }
+
+      return {
+        id: `item-${idx}`,
+        name: item.name || 'Unknown Item',
+        category: cat,
+        isVeg: item.isVeg !== undefined ? item.isVeg : null,
+        price: item.price || null,
+        description: item.description || null,
+        missingFields: [...new Set(missingFields)], // deduplicate
+        confidence: typeof item.confidence === 'number' ? item.confidence : 0.85, 
+        flags: [] // keeping for backwards compatibility with UI if needed
+      };
+    });
 
     return Response.json({ items: normalized, count: normalized.length });
 
@@ -83,14 +126,12 @@ export async function POST(request) {
     const msg = err.message || '';
     console.error('Extract API error:', msg);
 
-    // Always return quota_exceeded code so the client auto-falls back to demo
-    if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('billing') || msg.includes('API_KEY') || msg.includes('invalid')) {
+    if (msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('billing')) {
       return Response.json({ error: 'AI quota reached.', code: 'quota_exceeded' }, { status: 429 });
     }
     if (err instanceof SyntaxError) {
-      return Response.json({ error: 'Failed to parse AI response. Try a clearer image.' }, { status: 422 });
+      return Response.json({ error: 'Failed to parse AI response. The model output was not valid JSON.' }, { status: 422 });
     }
-    // Generic fallback — return quota_exceeded so demo triggers automatically
-    return Response.json({ error: msg || 'Extraction failed.', code: 'quota_exceeded' }, { status: 500 });
+    return Response.json({ error: msg || 'Extraction failed.' }, { status: 500 });
   }
 }
