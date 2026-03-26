@@ -10,13 +10,41 @@ const STEPS = [
   { id: 4, label: 'Categorizing & flagging...' },
 ];
 
+const DEMO_DATA = {
+  items: [
+    { id: 'item-0', name: 'Paneer Tikka', category: 'Starters', isVeg: true, price: '₹180', description: 'Grilled cottage cheese cubes marinated in spiced yoghurt, served with mint chutney.', flags: [] },
+    { id: 'item-1', name: 'Chicken Seekh Kebab', category: 'Starters', isVeg: false, price: '₹220', description: 'Minced chicken blended with herbs and spices, grilled on skewers.', flags: [] },
+    { id: 'item-2', name: 'Veg Spring Rolls', category: 'Starters', isVeg: true, price: '₹140', description: 'Crispy rolls stuffed with seasoned vegetables and noodles.', flags: [] },
+    { id: 'item-3', name: 'Tandoori Prawns', category: 'Starters', isVeg: false, price: '₹320', description: null, flags: ['missing_description'] },
+    { id: 'item-4', name: 'Hara Bhara Kabab', category: 'Starters', isVeg: true, price: '₹160', description: 'Shallow fried patties made with spinach, peas and potatoes.', flags: [] },
+    { id: 'item-5', name: 'Dal Makhani', category: 'Mains', isVeg: true, price: '₹240', description: 'Slow cooked black lentils in a rich buttery tomato gravy.', flags: [] },
+    { id: 'item-6', name: 'Butter Chicken', category: 'Mains', isVeg: false, price: '₹280', description: 'Tender chicken in a creamy tomato-based sauce with aromatic spices.', flags: [] },
+    { id: 'item-7', name: 'Palak Paneer', category: 'Mains', isVeg: true, price: '₹220', description: 'Fresh cottage cheese cubes in a smooth spiced spinach gravy.', flags: [] },
+    { id: 'item-8', name: 'Mutton Rogan Josh', category: 'Mains', isVeg: false, price: '₹360', description: 'Slow-braised mutton in a bold Kashmiri spice gravy.', flags: [] },
+    { id: 'item-9', name: 'Veg Biryani', category: 'Mains', isVeg: true, price: '₹200', description: 'Fragrant basmati rice layered with seasonal vegetables and whole spices.', flags: [] },
+    { id: 'item-10', name: 'Fish Curry', category: 'Mains', isVeg: false, price: null, description: 'Coastal style fish curry with coconut milk and tamarind.', flags: ['missing_price'] },
+    { id: 'item-11', name: 'Shahi Paneer', category: 'Mains', isVeg: true, price: '₹260', description: null, flags: ['missing_description'] },
+    { id: 'item-12', name: 'Mystery Special', category: 'Mains', isVeg: null, price: '₹299', description: 'Chef\'s secret recipe — ask your server for details.', flags: ['missing_veg_info'] },
+    { id: 'item-13', name: 'Gulab Jamun', category: 'Desserts', isVeg: true, price: '₹90', description: 'Soft milk-solid dumplings soaked in rose-scented sugar syrup.', flags: [] },
+    { id: 'item-14', name: 'Kulfi Falooda', category: 'Desserts', isVeg: true, price: '₹130', description: 'Traditional Indian ice cream served with vermicelli and rose syrup.', flags: [] },
+    { id: 'item-15', name: 'Chocolate Brownie', category: 'Desserts', isVeg: true, price: '₹160', description: 'Warm fudgy brownie served with a scoop of vanilla ice cream.', flags: [] },
+    { id: 'item-16', name: 'Mango Lassi', category: 'Beverages', isVeg: true, price: '₹90', description: 'Chilled yoghurt-based drink blended with Alphonso mangoes.', flags: [] },
+    { id: 'item-17', name: 'Masala Chai', category: 'Beverages', isVeg: true, price: '₹50', description: 'Spiced milk tea brewed with ginger, cardamom and cinnamon.', flags: [] },
+    { id: 'item-18', name: 'Cold Coffee', category: 'Beverages', isVeg: true, price: '₹110', description: 'Blended iced coffee with cream and sugar.', flags: [] },
+    { id: 'item-19', name: 'Steamed Rice', category: 'Sides', isVeg: true, price: '₹60', description: null, flags: ['missing_description'] },
+    { id: 'item-20', name: 'Butter Naan', category: 'Sides', isVeg: true, price: '₹40', description: 'Soft leavened flatbread baked in a tandoor, brushed with butter.', flags: [] },
+    { id: 'item-21', name: 'Raita', category: 'Sides', isVeg: true, price: '₹60', description: 'Chilled yoghurt with cucumber, cumin and fresh herbs.', flags: [] },
+  ],
+  count: 22,
+};
+
 export default function UploadPage() {
   const router = useRouter();
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [dragging, setDragging] = useState(false);
-  const [status, setStatus] = useState('idle'); // idle | processing | done | error
+  const [status, setStatus] = useState('idle');
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState('');
 
@@ -53,6 +81,7 @@ export default function UploadPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  // ── Real AI extraction ──
   const handleSubmit = async () => {
     if (!file) return;
     setStatus('processing');
@@ -68,21 +97,45 @@ export default function UploadPage() {
       setActiveStep(3);
 
       const data = await res.json();
+      // Auto-fallback to demo if quota exceeded
+      if (data.code === 'quota_exceeded' || res.status === 429) {
+        setActiveStep(4);
+        sessionStorage.setItem('menuData', JSON.stringify(DEMO_DATA));
+        sessionStorage.setItem('menuFileName', file.name);
+        sessionStorage.setItem('menuIsDemo', 'true');
+        setTimeout(() => { setStatus('done'); router.push('/results'); }, 600);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || 'Extraction failed');
 
       setActiveStep(4);
-      // Store in sessionStorage for results page
       sessionStorage.setItem('menuData', JSON.stringify(data));
       sessionStorage.setItem('menuFileName', file.name);
+      sessionStorage.setItem('menuIsDemo', 'false');
 
-      setTimeout(() => {
-        setStatus('done');
-        router.push('/results');
-      }, 600);
+      setTimeout(() => { setStatus('done'); router.push('/results'); }, 600);
     } catch (err) {
       setStatus('error');
       setError(err.message);
     }
+  };
+
+  // ── Demo mode — no API call ──
+  const handleDemo = () => {
+    setStatus('processing');
+    setActiveStep(1);
+
+    const steps = [1, 2, 3, 4];
+    steps.forEach((step, i) => {
+      setTimeout(() => setActiveStep(step), i * 500);
+    });
+
+    setTimeout(() => {
+      sessionStorage.setItem('menuData', JSON.stringify(DEMO_DATA));
+      sessionStorage.setItem('menuFileName', 'sample_indian_restaurant_menu.jpg');
+      sessionStorage.setItem('menuIsDemo', 'true');
+      router.push('/results');
+    }, 2400);
   };
 
   const reset = () => {
@@ -158,13 +211,30 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {!file && (
-                <div style={{ textAlign: 'center', marginTop: '24px' }}>
+              {/* Browse + Demo buttons */}
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px', flexWrap: 'wrap' }}>
+                {!file && (
                   <button className="btn btn-secondary" onClick={() => inputRef.current?.click()} id="browse-btn">
                     Browse Files
                   </button>
-                </div>
-              )}
+                )}
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleDemo}
+                  id="demo-btn"
+                  style={{ borderColor: 'rgba(0,201,167,0.4)', color: 'var(--accent-1)' }}
+                >
+                  🎬 Try with Demo Menu
+                </button>
+              </div>
+
+              {/* Demo hint */}
+              <p style={{
+                textAlign: 'center', marginTop: '12px',
+                fontSize: '0.78rem', color: 'var(--text-muted)'
+              }}>
+                No API key? Use the demo to see AI extraction results instantly.
+              </p>
             </>
           )}
 
@@ -199,8 +269,15 @@ export default function UploadPage() {
                   <span style={{ fontSize: '0.875rem' }}>{error}</span>
                 </div>
               </div>
-              <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                <button className="btn btn-primary" onClick={reset}>Try Again</button>
+              <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button className="btn btn-secondary" onClick={reset}>Try Again</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleDemo}
+                  id="demo-fallback-btn"
+                >
+                  🎬 Try Demo Instead
+                </button>
               </div>
             </>
           )}

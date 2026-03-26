@@ -99,8 +99,13 @@ export async function POST(request) {
   } catch (err) {
     console.error('Extract API error:', err);
     if (err instanceof SyntaxError) {
-      return Response.json({ error: 'Failed to parse AI response as JSON. Try a clearer image.' }, { status: 422 });
+      return Response.json({ error: 'Failed to parse AI response. Try a clearer image.' }, { status: 422 });
     }
-    return Response.json({ error: err.message || 'Internal server error' }, { status: 500 });
+    // Handle OpenAI quota / billing errors cleanly
+    const msg = err.message || '';
+    if (err.status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('billing')) {
+      return Response.json({ error: 'AI service quota reached. Please try the demo mode to see a sample extraction.', code: 'quota_exceeded' }, { status: 429 });
+    }
+    return Response.json({ error: 'Something went wrong. Please try again or use the demo mode.' }, { status: 500 });
   }
 }

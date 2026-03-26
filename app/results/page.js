@@ -57,13 +57,16 @@ export default function ResultsPage() {
   const [fileName, setFileName] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('menuData');
     const name = sessionStorage.getItem('menuFileName');
+    const demo = sessionStorage.getItem('menuIsDemo');
     if (raw) {
       setMenuData(JSON.parse(raw));
       setFileName(name || 'menu.jpg');
+      setIsDemo(demo === 'true');
     }
     setLoading(false);
   }, []);
@@ -123,6 +126,28 @@ export default function ResultsPage() {
       <Navbar />
       <div className="results-page">
         <div className="container">
+          {/* Demo banner */}
+          {isDemo && (
+            <div style={{
+              marginBottom: '24px', padding: '12px 20px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(0,201,167,0.08)',
+              border: '1px solid rgba(0,201,167,0.3)',
+              display: 'flex', alignItems: 'center', gap: '12px',
+              fontSize: '0.875rem'
+            }}>
+              <span style={{ fontSize: '1.1rem' }}>🎬</span>
+              <span>
+                <strong style={{ color: 'var(--accent-1)' }}>Demo Mode</strong>
+                <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>
+                  Showing sample Indian restaurant menu. Upload a real photo to extract your own menu.
+                </span>
+              </span>
+              <Link href="/upload" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', color: 'var(--accent-1)', fontWeight: 600, textDecoration: 'none', fontSize: '0.8rem' }}>
+                Upload Real Menu →
+              </Link>
+            </div>
+          )}
           {/* Header */}
           <div className="results-header">
             <div className="results-title">
