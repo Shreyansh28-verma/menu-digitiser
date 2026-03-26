@@ -180,10 +180,10 @@ export default function ResultsPage() {
                 ⬇️ Export JSON
               </button>
               <Link href="/upload" className="btn btn-primary btn-sm" id="upload-another-btn">
-                + Upload Another Page
+                + Add to Menu
               </Link>
               <button className="btn btn-secondary btn-sm" onClick={handleClear} id="clear-btn" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: 'var(--danger)' }}>
-                🗑️ Clear
+                🔄 Refresh Menu
               </button>
             </div>
           </div>
