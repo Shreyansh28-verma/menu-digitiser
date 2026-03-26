@@ -66,7 +66,6 @@ function MenuItemCard({ item }) {
 }
 
 export default function ResultsPage() {
-  const router = import('next/navigation').then(m => m.useRouter)().catch(() => ({ push: () => window.location.href = '/upload' }));
   const [menuData, setMenuData] = useState(null);
   const [fileName, setFileName] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
