@@ -97,15 +97,6 @@ export default function UploadPage() {
       setActiveStep(3);
 
       const data = await res.json();
-      // Auto-fallback to demo if quota exceeded
-      if (data.code === 'quota_exceeded' || res.status === 429) {
-        setActiveStep(4);
-        sessionStorage.setItem('menuData', JSON.stringify(DEMO_DATA));
-        sessionStorage.setItem('menuFileName', file.name);
-        sessionStorage.setItem('menuIsDemo', 'true');
-        setTimeout(() => { setStatus('done'); router.push('/results'); }, 600);
-        return;
-      }
       if (!res.ok) throw new Error(data.error || 'Extraction failed');
 
       setActiveStep(4);
