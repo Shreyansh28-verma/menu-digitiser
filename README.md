@@ -24,7 +24,7 @@ Restaurant owners upload a photo of their physical menu. The app:
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 14 (App Router) |
-| AI | OpenAI GPT-4o Vision API |
+| AI | Gemini 2.5 Flash Vision API |
 | Styling | Vanilla CSS (dark glassmorphism) |
 | Deployment | Vercel |
 
