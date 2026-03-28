@@ -10,7 +10,7 @@
 ## 🎯 What It Does
 
 Restaurant owners upload a photo of their physical menu. The app:
-1. Sends the image to **GPT-4o Vision**
+1. Sends the image to **Gemini 2.5 Flash model**
 2. Extracts every menu item (name, price, description)
 3. Auto-categorizes into **Starters, Mains, Desserts, Beverages, Sides**
 4. Detects **Veg / Non-Veg** classification
