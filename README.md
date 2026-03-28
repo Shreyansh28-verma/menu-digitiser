@@ -105,4 +105,3 @@ Each item:
 
 ---
 
-Built with ❤️ for Wootz Work take-home assignment.
